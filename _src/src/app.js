@@ -102,11 +102,34 @@ $$('.model button').forEach(b => b.addEventListener('click', async () => {
   try { await loadModel(key); b.disabled = false; refreshModels(); }
   catch (e) { b.disabled = false; row.querySelector('.st').textContent = '下載失敗，請確認網路後再試'; console.error(e); }
 }));
+// 模型一次只載入一個，避免 iPhone 記憶體不足被系統強制重新整理
 const loading = {};
+let loadChain = Promise.resolve();
 function loadModel(key) {
   if (ready.has(key)) return Promise.resolve();
-  if (!loading[key]) loading[key] = call('load', { key }).then(() => { ready.add(key); }).finally(() => { delete loading[key]; });
+  if (!loading[key]) {
+    loading[key] = loadChain = loadChain.catch(() => {}).then(async () => {
+      if (ready.has(key)) return;
+      store.set('loadingModel', key);          // 若載入中頁面被系統重整，下次開啟可以偵測到
+      try { await call('load', { key }); } finally { store.set('loadingModel', null); }
+      if (key.startsWith('asr_')) for (const k of [...ready]) if (k.startsWith('asr_')) ready.delete(k);
+      ready.add(key);
+    }).finally(() => { delete loading[key]; });
+  }
   return loading[key];
+}
+{
+  const crashed = store.get('loadingModel', null);
+  if (crashed) {
+    store.set('loadingModel', null);
+    if (crashed.startsWith('asr_base')) {
+      save('asr', 'asr_tiny');
+      $$('input[name=asrSel]').forEach(r => { r.checked = r.value === 'asr_tiny'; });
+      setTimeout(() => alertBox('上次使用「標準」語音辨識時頁面被系統重新整理（通常是手機記憶體不夠）。已自動改用「快速」模型。若想改回標準，建議先關掉其他 App 再到設定切換。'), 300);
+    } else {
+      setTimeout(() => alertBox(`上次使用「${keyName(crashed.split(':')[0])}」時頁面被系統重新整理（通常是手機記憶體不夠）。建議先關掉其他 App（尤其相機、遊戲）再試。`), 300);
+    }
+  }
 }
 
 // ---------- 語音 TTS ----------
@@ -271,7 +294,7 @@ function onAudio(e) {
 
   if (S.lmode === 'manual') {
     seg.push(buf); segSamples += buf.length;
-    if (segSamples / actx.sampleRate > 28) { finishSeg(); seg = []; }
+    if (segSamples / actx.sampleRate > 20) { finishSeg(); seg = []; }
     return;
   }
   if (!seg) {
@@ -284,7 +307,7 @@ function onAudio(e) {
     seg.push(buf); segSamples += buf.length;
     if (rms < thr) below += chunkMs; else below = 0;
     const dur = segSamples / actx.sampleRate;
-    if (below > 900 || dur > 28) { finishSeg(); }
+    if (below > 900 || dur > 20) { finishSeg(); }
   }
 }
 
@@ -316,8 +339,10 @@ function resample(x, from, to) {
 async function ensureModelsForListen() {
   const have = await cachedModels();
   if (!have.has(S.asr) && !navigator.onLine) { alertBox('語音辨識模型還沒下載，請先連上網路到「設定」下載。'); return; }
-  loadModel(S.asr).catch(e => alertBox('語音辨識模型載入失敗：' + e.message));
-  if (have.has('en2zh') || navigator.onLine) loadModel('en2zh').catch(() => {});
+  // 先載入語音辨識，完成後才載入英翻中（不要同時載）
+  loadModel(S.asr).then(() => {
+    if (have.has('en2zh') || navigator.onLine) return loadModel('en2zh');
+  }).catch(e => alertBox('模型載入失敗：' + e.message));
 }
 
 function enqueue(audio) {
@@ -332,7 +357,8 @@ async function pump() {
     card.querySelector('.en').textContent = ready.has(S.asr) ? '辨識中…' : '載入辨識模型中…';
     await loadModel(S.asr);
     card.querySelector('.en').textContent = '辨識中…';
-    const r = await call('asr', { key: S.asr, audio });
+    store.set('loadingModel', S.asr + ':run');
+    let r; try { r = await call('asr', { key: S.asr, audio }); } finally { store.set('loadingModel', null); }
     if (!r.text) { card.remove(); }
     else await fillCard(card, r.text, r.ms);
   } catch (e) {
@@ -349,12 +375,12 @@ function newCard(audio) {
   if (audio) {
     const btns = document.createElement('div'); btns.className = 'rbtns';
     btns.innerHTML = '<button class="replay">▶ 重聽原音</button>';
-    btns.querySelector('.replay').addEventListener('click', () => playRaw(audio.slice ? audio.slice() : audio));
+    const keep = audio.slice();
+    btns.querySelector('.replay').addEventListener('click', () => playRaw(keep));
     d.appendChild(btns);
-    d._audio = audio.slice();
   }
   $('#results').prepend(d);
-  const all = $$('#results .res'); if (all.length > 60) all.at(-1).remove();
+  const all = $$('#results .res'); if (all.length > 30) all.at(-1).remove();
   return d;
 }
 function playRaw(a) {

@@ -34784,7 +34784,16 @@ var MODELS = {
   zh2en: { task: "translation", id: "Xenova/opus-mt-zh-en", opts: { dtype: "q8" } }
 };
 var loaded = {};
-function load(key) {
+async function load(key) {
+  if (key.startsWith("asr_")) {
+    for (const k2 of Object.keys(loaded)) if (k2.startsWith("asr_") && k2 !== key) {
+      try {
+        (await loaded[k2]).dispose?.();
+      } catch {
+      }
+      delete loaded[k2];
+    }
+  }
   if (!loaded[key]) {
     const m2 = MODELS[key];
     loaded[key] = pipeline2(m2.task, m2.id, {

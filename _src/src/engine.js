@@ -43,7 +43,7 @@ const norm = s => s.toLowerCase()
   .replace(/pan[\s-]*pan/g, 'panpan')
   .replace(/[^a-z0-9#\s]/g, ' ').replace(/\b\d+(\.\d+)?\b/g, '#').replace(/\s+/g, ' ').trim();
 
-const STOP = new Set(['the', 'a', 'an', 'is', 'are', 'am', 'of', 'to', 'at', 'in', 'on', 'my', 'your', 'you', 'i', 'please', 'over', 'this', 'and', 'be', 'will', 'for', 'with', 'it', 'vhf']);
+const STOP = new Set(['the', 'a', 'an', 'is', 'are', 'am', 'of', 'to', 'at', 'in', 'on', 'my', 'your', 'you', 'i', 'over', 'this', 'and', 'be', 'for', 'with', 'it', 'vhf']);
 
 function bag(s) { return norm(s).split(' ').filter(w => w && !STOP.has(w) && w !== '#'); }
 

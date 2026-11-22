@@ -25,7 +25,14 @@ const MODELS = {
 };
 const loaded = {};
 
-function load(key) {
+async function load(key) {
+  // 只保留一個語音辨識模型在記憶體
+  if (key.startsWith('asr_')) {
+    for (const k of Object.keys(loaded)) if (k.startsWith('asr_') && k !== key) {
+      try { (await loaded[k]).dispose?.(); } catch {}
+      delete loaded[k];
+    }
+  }
   if (!loaded[key]) {
     const m = MODELS[key];
     loaded[key] = pipeline(m.task, m.id, {
