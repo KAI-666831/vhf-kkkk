@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VHF翻譯">
+<meta name="theme-color" content="#0b1620">
+<title>VHF 海事翻譯</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="title">VHF 海事翻譯</div>
+  <div id="netBadge" class="badge">離線可用</div>
+</header>
+
+<main>
+<!-- ===== 聽 ===== -->
+<section id="tab-listen" class="tab active">
+  <div id="modelWarn" class="notice hidden"></div>
+  <div class="listenCtl">
+    <button id="btnListen" class="big primary">開始收聽</button>
+    <div class="row">
+      <label class="seg"><input type="radio" name="lmode" value="auto" checked><span>自動分段</span></label>
+      <label class="seg"><input type="radio" name="lmode" value="manual"><span>手動錄一段</span></label>
+    </div>
+    <div class="meterWrap"><div id="meter"></div><div id="thrMark"></div></div>
+    <div class="row small">
+      <span>靈敏度</span>
+      <input id="sens" type="range" min="1" max="10" value="6">
+      <span id="lstate" class="muted">待機</span>
+    </div>
+  </div>
+  <details class="typeIn">
+    <summary>手動輸入英文（測試或補打）</summary>
+    <textarea id="typeEn" rows="2" placeholder="例：What are your intentions? Over."></textarea>
+    <button id="btnTypeEn">分析翻譯</button>
+  </details>
+  <div id="results"></div>
+</section>
+
+<!-- ===== 說 ===== -->
+<section id="tab-speak" class="tab">
+  <div class="card">
+    <div class="row">
+      <input id="themName" placeholder="對方船名（英文，例 EVER GIVEN）" autocapitalize="characters">
+    </div>
+    <div class="row">
+      <button id="btnSayName">念船名</button>
+      <button id="btnSpellName">字母拼讀</button>
+      <button id="btnStop" class="danger">停止</button>
+    </div>
+  </div>
+  <div id="catTabs" class="chips"></div>
+  <div id="catWarn" class="notice warn hidden"></div>
+  <div id="phraseList"></div>
+
+  <div class="card">
+    <div class="label">自由輸入中文 → 英文</div>
+    <textarea id="zhIn" rows="2" placeholder="例：我在你右前方三海里，請你往右轉"></textarea>
+    <button id="btnZh2En">翻成英文</button>
+    <textarea id="enOut" rows="3" placeholder="英文會出現在這裡，可以自己修改"></textarea>
+    <div class="muted small">機器翻譯可能不準，發話前請確認。能用上面的標準句就優先用標準句。</div>
+    <button id="btnSpeakEn" class="primary">播放英文</button>
+  </div>
+</section>
+
+<!-- ===== 詞彙 ===== -->
+<section id="tab-vocab" class="tab">
+  <input id="vSearch" placeholder="搜尋中文或英文">
+  <div class="muted small">點一下會念出英文</div>
+  <div id="vocabList"></div>
+</section>
+
+<!-- ===== 設定 ===== -->
+<section id="tab-settings" class="tab">
+  <div class="card">
+    <div class="label">本船資料</div>
+    <input id="myName" placeholder="本船英文船名（例 SHENG FA No.168）" autocapitalize="characters">
+    <input id="myAlias" placeholder="其他可能被叫的名字（可空白）" autocapitalize="characters">
+    <input id="myCS" placeholder="呼號 Call sign" autocapitalize="characters">
+    <input id="myMMSI" placeholder="MMSI（9位數）" inputmode="numeric">
+  </div>
+  <div class="card">
+    <div class="label">英文語音</div>
+    <select id="voiceSel"></select>
+    <div class="row small"><span>語速</span><input id="rate" type="range" min="0.5" max="1.2" step="0.05" value="0.85"><span id="rateV"></span></div>
+    <label class="check"><input id="itu" type="checkbox"> 數字用 ITU 航海念法（tree, fife, niner）</label>
+    <button id="btnTestVoice">試聽</button>
+  </div>
+  <div class="card">
+    <div class="label">離線模型（第一次請在有 Wi-Fi 時下載）</div>
+    <label class="check"><input type="radio" name="asrSel" value="asr_base" checked> 語音辨識：標準（約 140MB，較準）</label>
+    <label class="check"><input type="radio" name="asrSel" value="asr_tiny"> 語音辨識：快速（約 80MB，較快較不準）</label>
+    <div class="model" data-key="asr"><span>語音辨識</span><span class="st">未下載</span><button>下載</button></div>
+    <div class="model" data-key="en2zh"><span>英翻中</span><span class="st">未下載</span><button>下載</button></div>
+    <div class="model" data-key="zh2en"><span>中翻英</span><span class="st">未下載</span><button>下載</button></div>
+    <div class="bar"><div id="dlBar"></div></div>
+    <div id="dlText" class="muted small"></div>
+    <div id="storage" class="muted small"></div>
+  </div>
+  <div class="card small muted">
+    使用方式：手機放在無線電喇叭旁，或用音源線把無線電耳機孔接進手機。發話時把手機靠近無線電麥克風，自己按住 PTT 再按播放。<br>
+    此 App 只是輔助，安全相關通話請對方覆誦確認。真正遇險先按 DSC 遇險鍵。
+  </div>
+</section>
+</main>
+
+<nav>
+  <button data-tab="listen" class="active">🎧<span>聽</span></button>
+  <button data-tab="speak">🗣️<span>說</span></button>
+  <button data-tab="vocab">📖<span>詞彙</span></button>
+  <button data-tab="settings">⚙️<span>設定</span></button>
+</nav>
+
+<!-- 句子確認面板 -->
+<div id="sheet" class="sheet hidden">
+  <div class="sheetBox">
+    <div id="shZh" class="shZh"></div>
+    <div id="shParams"></div>
+    <div id="shEn" class="shEn"></div>
+    <div class="row">
+      <button id="shPlay" class="primary big">▶ 播放</button>
+    </div>
+    <div class="row">
+      <button id="shSlow">慢速播放</button>
+      <button id="shClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
